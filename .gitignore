@@ -5,6 +5,8 @@ out/
 
 ### Eclipse ###
 .apt_generated
+.idea
+job4j_di.iml
 .classpath
 .factorypath
 .project
