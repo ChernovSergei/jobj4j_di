@@ -1,13 +1,9 @@
 package springDemoAdvanced;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.annotation.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.*;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -32,13 +28,15 @@ public class MiniApplicationContext implements AutoCloseable {
 
     public MiniApplicationContext(String basePackage) {
         try {
-            Set<Class<?>> comps = scanPackage(basePackage);
+            Set<Class<?>> comps = ClassScanner.scanPackage(basePackage);
 
             for (Class<?> c :comps) {
+                System.out.println(c);
                 createBean(c);
             }
 
             for (Object bean : beans.values()) {
+                System.out.println(bean);
                 injectFields(bean);
                 injectSetters(bean);
             }
@@ -83,7 +81,7 @@ public class MiniApplicationContext implements AutoCloseable {
 
     private Object createBean(Class<?> type) throws Exception {
         if (beans.containsKey(type)) return beans.get(type);
-        if (!isComponent(type)) return null;
+        if (!ClassScanner.isComponent(type)) return null;
 
         if (!creating.add(type)) {
             throw new IllegalStateException("Circular dependency detected: " + type.getName());
@@ -118,51 +116,6 @@ public class MiniApplicationContext implements AutoCloseable {
             throw new NoSuchMethodException("No accessible constructor for " + type.getName());
         }
         return publicCtors[0];
-    }
-
-    private Set<Class<?>> scanPackage(String basePackage)
-            throws IOException, URISyntaxException, ClassNotFoundException {
-        String path = basePackage.replace('.', '/');
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
-        Enumeration<URL> urls = cl.getResources(path);
-
-        Set<Class<?>> result = new HashSet<>();
-        while (urls.hasMoreElements()) {
-            URL url = urls.nextElement();
-            File root = new File(url.toURI());
-            if (root.isDirectory()) {
-                scanDirRecursive(basePackage, root, root, result);
-            }
-        }
-        return result;
-    }
-
-    private void scanDirRecursive(String basePackage, File root, File dir, Set<Class<?>> out)
-        throws ClassNotFoundException {
-        File[] files = dir.listFiles();
-        if (files == null) return;
-
-        for (File f : files) {
-            if (f.isDirectory()) {
-                scanDirRecursive(basePackage, root, f, out);
-            } else if (f.getName().endsWith(".class")) {
-                String className = toClassName(basePackage, root, f);
-                Class<?> clazz = Class.forName(className);
-                if (isComponent(clazz)) out.add(clazz);
-            }
-        }
-    }
-
-    private String toClassName(String basePackage, File root, File classFile) {
-        String absRoot = root.getAbsolutePath();
-        String absFile = classFile.getAbsolutePath();
-        String rel = absFile.substring(absRoot.length() + 1, absFile.length() - ".class".length());
-        String relDots = rel.replace(File.separatorChar, '.');
-        return basePackage + (relDots.isEmpty() ? "" : "." + relDots);
-    }
-
-    private boolean isComponent(Class<?> c) {
-        return c.isAnnotationPresent(Component.class);
     }
 
     public <T> void run(Class<T> rootClass) {
